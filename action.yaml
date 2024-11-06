@@ -1,0 +1,121 @@
+name: "Sideko SDK Update"
+description: "Update multiple Sideko-managed SDKs when API specifications change"
+author: "Sideko"
+
+branding:
+  icon: "refresh-cw"
+  color: "blue"
+
+inputs:
+  release-type:
+    description: "Release type for version increment (major, minor, patch)"
+    required: true
+  sdk-repos:
+    description: 'JSON array of SDK repositories to update. Format: ["owner/repo"]'
+    required: true
+  github-token:
+    description: "GitHub token with access to SDK repositories"
+    required: true
+  sideko-api-key:
+    description: "Sideko API key"
+    required: true
+  config-path:
+    description: "Path to your SDK config file in the current repository"
+    required: false
+    default: "sdk-config.yaml"
+  auto-merge:
+    description: "Enable auto-merge for the created PRs"
+    required: true
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.x"
+
+    - name: Setup Sideko CLI
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install sideko-py
+        echo "${{ inputs.sideko-api-key }}" > ~/.sideko
+
+    - name: Process SDK Repositories
+      shell: bash
+      run: |
+        # Parse SDK repos JSON
+        echo "${{ inputs.sdk-repos }}" > sdk-repos.json
+
+        # Create temporary directory for SDK checkouts
+        mkdir -p sdks
+
+        # Function to update a single SDK
+        update_sdk() {
+          local repo=$1
+          local checkout_dir="sdks/${repo//\//_}"
+          
+          echo "🔄 Processing SDK repository: $repo"
+          
+          # Checkout SDK repository
+          gh repo clone "$repo" "$checkout_dir"
+          cd "$checkout_dir"
+          
+          # Update SDK
+          if ! sideko sdk update . "${{ github.workspace }}/${{ inputs.config-path }}" "${{ inputs.release-type }}"; then
+            echo "❌ Failed to update SDK for $repo"
+            return 1
+          fi
+          
+          # Check for changes
+          if [[ -z "$(git status --porcelain)" ]]; then
+            echo "ℹ️ No changes needed for $repo"
+            return 0
+          fi
+          
+          # Create branch and commit changes
+          local branch="feat/sdk-update-$(date +%Y%m%d-%H%M%S)"
+          git checkout -b "$branch"
+          
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          # Commit and push changes
+          git add .
+          git commit -m "${{ inputs.release-type }} release: update SDK to match latest API spec"
+
+          - Update type: ${{ inputs.release-type }}"
+          git push origin "$branch"
+          
+          # Create PR
+          pr_url=$(gh pr create \
+            --title "SDK update (${{ inputs.release-type }})" \
+            --body "SDK update" \
+            --repo "$repo" \
+            --head "$branch" \
+            --base "main")
+            
+          # Enable auto-merge if requested
+          if [ "${{ inputs.auto-merge }}" = "true" ]; then
+            gh pr merge "$pr_url" --auto --merge
+          fi
+          
+          echo "✅ Created PR for $repo: $pr_url"
+          return 0
+        }
+
+        # Process each repository
+        success=true
+        for repo in $(jq -r '.[]' sdk-repos.json); do
+          if ! update_sdk "$repo"; then
+            success=false
+          fi
+        done
+
+        # Return overall status
+        $success
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
