@@ -1,5 +1,7 @@
 ## Sideko SDK Updates Github Action
 
+Use this github action to update Sideko generated SDKs
+
 ### Getting Started Example
 ```yaml
 jobs:
