@@ -8,9 +8,15 @@ jobs:
     steps:
       - uses: sideko-inc/sdk-release
         with:
-          release-type: patch
+          release-type: ${{ inputs.release-type }}
           sdk-repos: |-
-            sideko-inc/sideko-ts
-          github-token: ${{ secrets.SDK_GITHUB_PAT }}
+            your-org/cli
+            your-org/client-ts
+            your-org/client-py
+            your-org/client-rb
+            your-org/client-go
+            your-org/client-java
+            your-org/client-rs
+          github-token: ${{ secrets.SDK_GITHUB_TOKEN }}
           sideko-api-key: ${{ secrets.SIDEKO_SERVICE_ACCOUNT_KEY }}
 ```
