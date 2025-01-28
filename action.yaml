@@ -1,113 +1,228 @@
-name: "Sideko SDK Update"
-description: "Automatically updates SDKs as APIs evolve"
-author: "Sideko-Inc"
-
+name: Sideko SDK Update
+description: Automatically updates SDKs as APIs evolve
+author: Sideko-Inc
 branding:
-  icon: "git-merge"
-  color: "green"
+  icon: git-merge
+  color: green
 
 inputs:
-  release-type:
-    description: "Release type for version increment (major, minor, patch)"
+  repo:
+    description: SDK repo to update (e.g. your-org/repo)
     required: true
-  sdk-repos:
-    description: "List of SDK repositories to update (one per line)"
+  sdk-version:
+    description: |
+      Exact version to set the SDK (e.g. 1.4.2) or a release version for automatic version incrementing (permitted values: https://docs.sideko.dev/references/sideko/update-sdk)
     required: true
   github-token:
-    description: "GitHub token with access to SDK repositories"
+    description: GitHub token with appropriate access to the SDK repo
     required: true
   sideko-api-key:
-    description: "Sideko API key"
+    description: Sideko API key
+    required: true
+  language:
+    description: "Programming language of the repo (permitted values: https://docs.sideko.dev/references/sideko/generate-sdk)"
     required: true
   config-path:
-    description: "Path to your SDK config file in the current repository"
+    description: Path to your SDK config file in the current repository
     required: false
-    default: "sdk-config.yaml"
+    default: sdk-config.yaml
+  api-version:
+    description: Version of the API in sideko to generate from
+    required: false
+    default: latest
   auto-merge:
-    description: "Enable auto-merge for the created PRs"
+    description: Automatically merge the created PR
     required: false
     default: "false"
+  base-branch:
+    description: Base branch to create PR against
+    required: false
+    default: main
+  changelog:
+    description: Changelog content to include in PR description
+    required: false
+  branch-prefix:
+    description: Prefix for the created branch names
+    required: false
+    default: sdk-release
+  pr-title-template:
+    description: Template for PR title. Use {type} for release type
+    required: false
+    default: SDK release ({type})
 
 runs:
-  using: "composite"
+  using: composite
   steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.x"
-
-    - name: Setup Sideko CLI
+    - name: Install Sideko CLI
       shell: bash
       run: |
-        python -m pip install --upgrade pip
-        pip install sideko-py
-        echo "SIDEKO_API_KEY=${{ inputs.sideko-api-key }}" > ~/.sideko
+        if ! command -v sideko > /dev/null 2>&1; then
+            curl -fsSL https://raw.githubusercontent.com/Sideko-Inc/sideko/main/install.sh | sh;
+        else
+            echo "Sideko CLI already installed: $(sideko -V)"
+        fi
 
-    - name: Process SDK Repositories
+    # -------------------------------------------------
+    #  Clone SDK repository using user-provided
+    #  git token
+    # -------------------------------------------------
+    - name: Checkout SDK Repository
+      id: checkout-sdk-repo
       shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
       run: |
         # Create temporary directory for SDK checkouts
         mkdir -p sdks
 
-        update_sdk() {
-          local repo=$(echo "$1" | xargs | tr '[:upper:]' '[:lower:]')  # Trim whitespace and convert to lowercase
-          local safe_dir=$(echo "$repo" | tr '/' '_')
-          local checkout_dir="sdks/$safe_dir"
+        # clean repo name for filesystem
+        repo=$(echo "${{ inputs.repo }}" | xargs | tr '[:upper:]' '[:lower:]')
+        safe_dir=$(echo "$repo" | tr '/' '_')
+        checkout_dir="sdks/$safe_dir"
 
-          echo "🔄 Processing SDK repository: '$1'"  # Use original name for Git operations
-          echo "📂 Using directory: $checkout_dir"
+        echo "Checking out ${{ inputs.repo }} to ${checkout_dir}..."
 
-          gh repo clone "$repo" "$checkout_dir"
-          cd "$checkout_dir"
-          # Update SDK
-          if ! sideko sdk update . "${{ github.workspace }}/${{ inputs.config-path }}" "${{ inputs.release-type }}"; then
-            echo "❌ Failed to update SDK for $repo"
-            return 1
-          fi
-          # Check for changes
-          if [[ -z "$(git status --porcelain)" ]]; then
-            echo "ℹ️ No changes needed for $repo"
-            return 0
-          fi
-          # Create branch and commit changes
-          local branch="sdk-release-$(date +%m/%d/%Y)"
-          git checkout -b "$branch"
-          # Configure git
-          git config user.name "sdk-github-actions[bot]"
-          git config user.email "sdk-github-actions[bot]@users.noreply.github.com"
-          git config --global url."https://${{ inputs.github-token }}@github.com/".insteadOf "https://github.com/"
-          # Commit and push changes
-          git add .
-          git commit -m "${{ inputs.release-type }} release: update SDK to match latest API specification"
-          git push origin "$branch"
-          # Create PR
-          pr_url=$(gh pr create \
-            --title "SDK release (${{ inputs.release-type }})" \
-            --body "SDK release $(date +%m/%d/%Y)" \
-            --repo "$repo" \
-            --head "$branch" \
-            --base "main")
-          # Enable auto-merge if requested
-          if [ "${{ inputs.auto-merge }}" = "true" ]; then
-            gh pr merge "$pr_url" --auto --merge
-          fi
-          echo "✅ Created PR for $repo: $pr_url"
-          return 0
-        }
+        gh repo clone "$repo" "$checkout_dir"
 
-        # Process each repository from the multi-line input
-        success=true
-        echo "${{ inputs.sdk-repos }}" | while IFS= read -r repo || [ -n "$repo" ]; do
-          repo=$(echo "$repo" | xargs)  # Trim whitespace
-          if [ -n "$repo" ]; then  # Skip empty lines
-            if ! update_sdk "$repo"; then
-              success=false
-            fi
-          fi
-        done
+        echo "checkout_dir=${checkout_dir}" >> $GITHUB_OUTPUT
 
-        # Return overall status
-        $success
+    # -------------------------------------------------
+    #  Update SDK repository with sideko CLI
+    # -------------------------------------------------
+    - name: Update SDK
+      id: update-sdk
+      shell: bash
+      working-directory: ${{ steps.checkout-sdk-repo.outputs.checkout_dir }}
+      env:
+        SIDEKO_API_KEY: ${{ inputs.sideko-api-key }}
+      run: |
+        echo "Updating SDK at ${{ steps.checkout-sdk-repo.outputs.checkout_dir }}"
+        sideko sdk update \
+            --repo . \
+            --config "${{ github.workspace }}/${{ inputs.config-path }}" \
+            --version "${{ inputs.sdk-version }}" \
+            --api-version "${{ inputs.api-version }}" \
+            -v
+
+
+        if [[ -z "$(git status --porcelain)" ]]; then
+          echo "ℹ️ No changes needed for ${{ inputs.repo }}"
+          echo "has_changes=false" >> $GITHUB_OUTPUT
+        else
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+        fi
+
+    # -------------------------------------------------
+    #  Rust ONLY - Update Cargo.lock
+    # -------------------------------------------------
+    - name: Setup Rust
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      if: ${{ inputs.language == 'rust' && steps.update-sdk.outputs.has_changes == 'true' }}
+      with:
+        rustflags: ""
+        cache-workspaces: ${{ steps.checkout-sdk-repo.outputs.checkout_dir }} -> ${{ steps.checkout-sdk-repo.outputs.checkout_dir }}/target
+    - name: Update Cargo.lock
+      shell: bash
+      if: ${{ inputs.language == 'rust' && steps.update-sdk.outputs.has_changes == 'true' }}
+      working-directory: ${{ steps.checkout-sdk-repo.outputs.checkout_dir }}
+      run: cargo check
+
+    # -------------------------------------------------
+    #  Typescript ONLY - Update package-lock.json
+    # -------------------------------------------------
+    - name: Setup Node
+      if: ${{ inputs.language == 'typescript' && steps.update-sdk.outputs.has_changes == 'true' }}
+      uses: actions/setup-node@v3
+      with:
+        cache: "npm"
+        cache-dependency-path: "${{ steps.checkout-sdk-repo.outputs.checkout_dir }}/package-lock.json"
+    - name: Update package-lock.json
+      if: ${{ inputs.language == 'typescript' && steps.update-sdk.outputs.has_changes == 'true' }}
+      shell: bash
+      working-directory: ${{ steps.checkout-sdk-repo.outputs.checkout_dir }}
+      run: npm install
+
+    # -------------------------------------------------
+    #  Python ONLY - Update poetry.lock
+    # -------------------------------------------------
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      if: ${{ inputs.language == 'python' && steps.update-sdk.outputs.has_changes == 'true' }}
+      with:
+        python-version: "3.8"
+    - name: Setup Poetry
+      if: ${{ inputs.language == 'python' && steps.update-sdk.outputs.has_changes == 'true' }}
+      uses: snok/install-poetry@v1
+      with:
+        version: 1.8.5
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+        virtualenvs-path: ${{ steps.checkout-sdk-repo.outputs.checkout_dir }}/.venv
+        installer-parallel: true
+    - name: Load Cached Python Dependencies
+      if: ${{ inputs.language == 'python' && steps.update-sdk.outputs.has_changes == 'true' }}
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.checkout-sdk-repo.outputs.checkout_dir }}.venv
+        key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+    - name: Update poetry.lock
+      if: ${{ inputs.language == 'python' && steps.update-sdk.outputs.has_changes == 'true' }}
+      working-directory: ${{ steps.checkout-sdk-repo.outputs.checkout_dir }}
+      shell: bash
+      run: poetry lock --no-update
+
+    - name: Push & Open PR
+      id: push-open-pr
+      shell: bash
+      if: ${{ steps.update-sdk.outputs.has_changes == 'true' }}
+      working-directory: ${{ steps.checkout-sdk-repo.outputs.checkout_dir }}
       env:
         GH_TOKEN: ${{ inputs.github-token }}
+      run: |
+        # Configure git
+        git config user.name "sdk-github-actions[bot]"
+        git config user.email "sdk-github-actions[bot]@users.noreply.github.com"
+        git config --global url."https://${{ inputs.github-token }}@github.com/".insteadOf "https://github.com/"
+
+        # Create branch and push
+        branch="${{ inputs.branch-prefix }}-$(date +%Y/%m/%d-%H.%M.%S)"
+        git checkout -b "$branch"
+        git add .
+        commit_message="chore(release): ${{ inputs.sdk-version }}"
+        git commit -m "$commit_message"
+
+        git push origin "$branch"
+
+        # Open PR
+        description="SDK release $(date +%Y-%m-%d)"
+        if [ -n "${{ inputs.changelog }}" ]; then
+          description+=$'\n\n### Changelog\n'"${{ inputs.changelog }}"
+        fi
+        pr_title="${{ inputs.pr-title-template }}"
+        pr_title="${pr_title/\{type\}/${{ inputs.sdk-version }}}"
+
+        pr_url=$(gh pr create \
+          --title "$pr_title" \
+          --body "$(format_pr_description)" \
+          --repo "$repo" \
+          --head "$branch" \
+          --base "${{ inputs.base-branch }}")
+
+        echo "✅ Opened PR: ${pr_url}"
+
+        echo "pr_url=${pr_url}" >> $GITHUB_OUTPUT
+
+    - name: Merge PR
+      id: merge-pr
+      shell: bash
+      if: ${{ inputs.auto-merge == 'true' && steps.update-sdk.outputs.has_changes == 'true' && steps.push-open-pr.outputs.pr_url != null }}
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: |
+        echo "Automatically merging ${{ steps.push-open-pr.outputs.pr_url }}..."
+        # First enable auto-merge on the repository if not already enabled
+        gh repo edit "$repo" --enable-auto-merge || true
+        # Then enable it for the PR
+        gh pr merge "$pr_url" --auto --merge --delete-branch || true
+
+        echo "✅ PR Merged"
