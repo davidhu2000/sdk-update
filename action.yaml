@@ -25,7 +25,7 @@ inputs:
   sideko-api-key:
     description: Sideko API key with appropriate access to the API project
     required: true
-  config-path:
+  sideko-config-path:
     description: Path to your SDK config file in the current repository
     required: false
     default: sdk-config.yaml
@@ -102,7 +102,7 @@ runs:
         echo "Updating SDK at ${{ steps.checkout-sdk-repo.outputs.checkout_dir }}"
         sideko sdk update \
             --repo . \
-            --config "${{ github.workspace }}/${{ inputs.config-path }}" \
+            --config "${{ github.workspace }}/${{ inputs.sideko-config-path }}" \
             --version "${{ inputs.sdk-version }}" \
             --api-version "${{ inputs.api-version }}" \
             -v
@@ -199,7 +199,7 @@ runs:
         # Open PR
         description="SDK release $(date +%Y-%m-%d)"
         if [ -n "${{ inputs.pr-description }}" ]; then
-          description+=$'\n${{ inputs.pr-description }}"
+          description+="\n${{ inputs.pr-description }}"
         fi
         pr_title="${{ inputs.pr-title-template }}"
         pr_title="${pr_title/\{type\}/${{ inputs.sdk-version }}}"
