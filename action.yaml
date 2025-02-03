@@ -185,7 +185,7 @@ runs:
         # Configure git
         git config user.name "sdk-github-actions[bot]"
         git config user.email "sdk-github-actions[bot]@users.noreply.github.com"
-        git config --global url."https://${{ inputs.github-token }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${{ inputs.github-token }}@github.com/".insteadOf "https://github.com/"
 
         # Create branch and push
         branch="${{ inputs.branch-prefix }}-$(date +%Y/%m/%d-%H.%M.%S)"
