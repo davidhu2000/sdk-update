@@ -27,7 +27,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: sideko-inc/sdk-update
+      - uses: sideko-inc/sdk-update@v1
         with:
           repo: your-org/client-py
           language: python
