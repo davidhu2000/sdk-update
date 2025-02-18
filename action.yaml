@@ -201,8 +201,21 @@ runs:
 
         # Open PR
         description="SDK release $(date +%Y-%m-%d)"
+
+        # Handle multiline PR description by using a heredoc
         if [ -n "${{ inputs.pr-description }}" ]; then
-          description+="\n${{ inputs.pr-description }}"
+          # Create a temporary file to store the combined description
+          temp_desc=$(mktemp)
+          # Write the base description and input description to temp file
+          cat << EOF > "$temp_desc"
+$description
+
+${{ inputs.pr-description }}
+EOF
+          # Read the combined description back
+          description=$(<"$temp_desc")
+          # Clean up temp file
+          rm "$temp_desc"
         fi
         pr_title="${{ inputs.pr-title-template }}"
         pr_title="${pr_title/\{type\}/${{ inputs.sdk-version }}}"
