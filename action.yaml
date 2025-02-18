@@ -202,7 +202,7 @@ runs:
         # Open PR
         read -r -d '' pr_description <<EOF
         ${{ inputs.pr-description }}
-        EOF
+EOF
 
         if [[ -n "$pr_description" ]]; then
           description+=$'\n'"$pr_description"
