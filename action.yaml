@@ -200,10 +200,14 @@ runs:
         git push origin "$branch"
 
         # Open PR
-        description="SDK release $(date +%Y-%m-%d)"
-        if [ -n "${{ inputs.pr-description }}" ]; then
-          description+=$'\n'"${{ inputs.pr-description }}"
+        read -r -d '' pr_description <<EOF
+        ${{ inputs.pr-description }}
+        EOF
+
+        if [[ -n "$pr_description" ]]; then
+          description+=$'\n'"$pr_description"
         fi
+
         pr_title="${{ inputs.pr-title-template }}"
         pr_title="${pr_title/\{type\}/${{ inputs.sdk-version }}}"
 
