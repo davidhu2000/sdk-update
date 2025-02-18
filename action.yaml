@@ -180,8 +180,9 @@ runs:
     - id: pr-description
       shell: bash
       run: |
+        pr_description="${{ inputs.pr-description }}"
         echo "pr_description=<<EOF" >> $GITHUB_OUTPUT
-        echo ${{ inputs.pr-description }} >> $GITHUB_OUTPUT
+        echo $pr_description >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
 
     - name: Push & Open PR
