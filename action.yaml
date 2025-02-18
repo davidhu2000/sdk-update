@@ -48,6 +48,9 @@ inputs:
   pr-description:
     description: Description content (markdown) to include in SDK PR
     required: false
+  pr-label:
+    description: Label to add to PR
+    required: false
   branch-prefix:
     description: Prefix for the created branch names
     required: false
@@ -209,6 +212,7 @@ runs:
           --body "$description" \
           --repo "$repo" \
           --head "$branch" \
+          --label "${{ inputs.pr-label }}" \
           --base "${{ inputs.pr-base-branch }}")
 
         echo "✅ Opened PR: ${pr_url}"
