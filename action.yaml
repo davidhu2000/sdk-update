@@ -177,15 +177,15 @@ runs:
       shell: bash
       run: poetry lock --no-update
 
-    - id: pr-description
-      shell: bash
-      env:
-        PR_DESCRIPTION: ${{ inputs.pr-description }}
-      run: |
-        pr_description="${PR_DESCRIPTION}"
-        echo "pr_description=<<EOF" >> $GITHUB_OUTPUT
-        echo $pr_description >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
+    # - id: pr-description
+    #   shell: bash
+    #   env:
+    #     PR_DESCRIPTION: ${{ inputs.pr-description }}
+    #   run: |
+    #     pr_description="${PR_DESCRIPTION}"
+    #     echo "pr_description=<<EOF" >> $GITHUB_OUTPUT
+    #     echo $pr_description >> $GITHUB_OUTPUT
+    #     echo "EOF" >> $GITHUB_OUTPUT
 
     - name: Push & Open PR
       id: push-open-pr
@@ -217,9 +217,9 @@ runs:
         pr_title="${{ inputs.pr-title-template }}"
         pr_title="${pr_title/\{type\}/${{ inputs.sdk-version }}}"
 
+        #  --body "${{ steps.pr-description.outputs.pr_description }}" \
         pr_url=$(gh pr create \
           --title "$pr_title" \
-          --body "${{ steps.pr-description.outputs.pr_description }}" \
           --repo "$repo" \
           --head "$branch" \
           --label "${{ inputs.pr-label }}" \
