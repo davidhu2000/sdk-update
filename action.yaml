@@ -206,7 +206,7 @@ runs:
 
         pr_url=$(gh pr create \
           --title "$pr_title" \
-          --body "$(format_pr_description)" \
+          --body "$description" \
           --repo "$repo" \
           --head "$branch" \
           --base "${{ inputs.pr-base-branch }}")
