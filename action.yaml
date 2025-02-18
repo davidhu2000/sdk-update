@@ -209,17 +209,18 @@ runs:
 
         git push origin "$branch"
 
-
-        if [[ -n "$pr_description" ]]; then
-          description+=$'\n'"$pr_description"
-        fi
-
+        # Open PR
+        description="SDK release $(date +%Y-%m-%d)"
+        # if [[ -n "$pr_description" ]]; then
+        #   description+=$'\n'"$pr_description"
+        # fi
         pr_title="${{ inputs.pr-title-template }}"
         pr_title="${pr_title/\{type\}/${{ inputs.sdk-version }}}"
 
         #  --body "${{ steps.pr-description.outputs.pr_description }}" \
         pr_url=$(gh pr create \
           --title "$pr_title" \
+          --body "$(format_pr_description)" \
           --repo "$repo" \
           --head "$branch" \
           --label "${{ inputs.pr-label }}" \
