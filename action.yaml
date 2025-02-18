@@ -177,6 +177,13 @@ runs:
       shell: bash
       run: poetry lock --no-update
 
+    - id: pr-description
+      shell: bash
+      run: |
+        echo "pr_description=<<EOF" >> $GITHUB_OUTPUT
+        echo "${{ inputs.pr-description }}" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
     - name: Push & Open PR
       id: push-open-pr
       shell: bash
@@ -199,10 +206,6 @@ runs:
 
         git push origin "$branch"
 
-        # Open PR
-        read -r -d '' pr_description <<EOF
-        ${{ inputs.pr-description }}
-EOF
 
         if [[ -n "$pr_description" ]]; then
           description+=$'\n'"$pr_description"
@@ -213,7 +216,7 @@ EOF
 
         pr_url=$(gh pr create \
           --title "$pr_title" \
-          --body "$(echo -e "$description")" \
+          --body "${{ steps.pr-description.outputs.pr_description }}" \
           --repo "$repo" \
           --head "$branch" \
           --label "${{ inputs.pr-label }}" \
