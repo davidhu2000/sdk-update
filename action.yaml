@@ -209,7 +209,7 @@ runs:
 
         pr_url=$(gh pr create \
           --title "$pr_title" \
-          --body "$description" \
+          --body "$(echo -e "$description")" \
           --repo "$repo" \
           --head "$branch" \
           --label "${{ inputs.pr-label }}" \
