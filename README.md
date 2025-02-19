@@ -17,10 +17,16 @@
 
 # SDK Update Action
 
-Easily update Sideko SDKs with this action. This action is designed only for updates,
-if you do not yet have a Sideko generated SDK, install the [`sideko`](https://github.com/Sideko-Inc/sideko) CLI and run `sideko sdk init` to get started!
+Automatically sync Sideko SDKs to the latest state of your API. 
+
+The action designed only for updates. If you do not yet have a Sideko generated SDK, install the [`sideko`](https://github.com/Sideko-Inc/sideko) CLI and run `sideko sdk init` to get started!
 
 ## Quick Start
+1. *Create a Sideko API key* - In the Sideko UI, click the "API Keys" tab and create an API with scoped access to the API that the SDK is for.
+2. *Create a GitHub Token* - [Follow this guide](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) from Github to retrieve a GitHub token.
+3. Use the sample GitHub workflow to create your own SDK update action.
+
+
 
 ```yaml
 jobs:
